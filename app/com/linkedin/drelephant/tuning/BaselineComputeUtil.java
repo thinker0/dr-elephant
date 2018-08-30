@@ -22,6 +22,7 @@ import com.linkedin.drelephant.ElephantContext;
 import com.linkedin.drelephant.mapreduce.heuristics.CommonConstantsHeuristic;
 import com.linkedin.drelephant.util.Utils;
 import controllers.AutoTuningMetricsController;
+import java.util.ArrayList;
 import java.util.List;
 import models.TuningJobDefinition;
 import org.apache.commons.io.FileUtils;
@@ -36,8 +37,9 @@ import org.apache.log4j.Logger;
 public class BaselineComputeUtil {
 
   private static final Integer NUM_JOBS_FOR_BASELINE_DEFAULT = 30;
-  private static final String BASELINE_EXECUTION_COUNT = "baseline.execution.count";
   private final Logger logger = Logger.getLogger(getClass());
+  private static final String BASELINE_EXECUTION_COUNT = "baseline.execution.count";
+
   private Integer _numJobsForBaseline = null;
 
   public BaselineComputeUtil() {
@@ -88,8 +90,13 @@ public class BaselineComputeUtil {
    */
   private List<TuningJobDefinition> getJobForBaselineComputation() {
     logger.info("Fetching jobs for which baseline metrics need to be computed");
-    List<TuningJobDefinition> tuningJobDefinitions =
-        TuningJobDefinition.find.where().eq(TuningJobDefinition.TABLE.averageResourceUsage, null).findList();
+    List<TuningJobDefinition> tuningJobDefinitions = new ArrayList<TuningJobDefinition>();
+    try {
+      tuningJobDefinitions =
+          TuningJobDefinition.find.where().eq(TuningJobDefinition.TABLE.averageResourceUsage, null).findList();
+    } catch (NullPointerException e) {
+      logger.info("There are no jobs for which baseline has to be computed", e);
+    }
     return tuningJobDefinitions;
   }
 

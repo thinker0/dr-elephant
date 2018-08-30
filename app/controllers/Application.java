@@ -71,7 +71,6 @@ import views.html.page.oldJobHistoryPage;
 import views.html.page.searchPage;
 import views.html.results.*;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -915,10 +914,6 @@ public class Application extends Controller {
       String client = paramValueMap.get("client");
       String scheduler = paramValueMap.get("scheduler");
       String defaultParams = paramValueMap.get("defaultParams");
-      Integer version = 1;
-      if (paramValueMap.containsKey("version")) {
-        version = Integer.parseInt(paramValueMap.get("version"));
-      }
       Boolean isRetry = false;
       if (paramValueMap.containsKey("isRetry")) {
         isRetry = Boolean.parseBoolean(paramValueMap.get("isRetry"));
@@ -953,7 +948,6 @@ public class Application extends Controller {
       tuningInput.setClient(client);
       tuningInput.setScheduler(scheduler);
       tuningInput.setDefaultParams(defaultParams);
-      tuningInput.setVersion(version);
       tuningInput.setRetry(isRetry);
       tuningInput.setSkipExecutionForOptimization(skipExecutionForOptimization);
       tuningInput.setJobType(jobType);
@@ -966,44 +960,21 @@ public class Application extends Controller {
     } catch (Exception e) {
       AutoTuningMetricsController.markGetCurrentRunParametersFailures();
       logger.error("Exception parsing input: ", e);
-      return notFound("Error parsing input " + e.getMessage());
-    } finally {
-      if (context != null) {
+      return notFound("Error parsing input ");
+    }finally{
+      if(context!=null)
+      {
         context.stop();
       }
     }
   }
 
-  private static JsonNode formatGetCurrentRunParametersOutput(Map<String, Double> outputParams, Integer version) {
-    if (version == 1) {
-      return Json.toJson(outputParams);
-    } else {
-      Map<String, String> outputParamFormatted = new HashMap<String, String>();
-
-      //Temporarily removing input split parameters
-      outputParams.remove("pig.maxCombinedSplitSize");
-      outputParams.remove("mapreduce.input.fileinputformat.split.maxsize");
-
-      for (Map.Entry<String, Double> param : outputParams.entrySet()) {
-        if (param.getKey().equals("mapreduce.map.sort.spill.percent")) {
-          outputParamFormatted.put(param.getKey(), String.valueOf(param.getValue()));
-        } else if (param.getKey().equals("mapreduce.map.java.opts")
-            || param.getKey().equals("mapreduce.reduce.java.opts")) {
-          outputParamFormatted.put(param.getKey(), "-Xmx" + Math.round(param.getValue()) + "m");
-        } else {
-          outputParamFormatted.put(param.getKey(), String.valueOf(Math.round(param.getValue())));
-        }
-      }
-      return Json.toJson(outputParamFormatted);
-    }
-  }
-
-  private static Result getCurrentRunParameters(TuningInput tuningInput) throws Exception {
+  private static Result getCurrentRunParameters(TuningInput tuningInput) {
     AutoTuningAPIHelper autoTuningAPIHelper = new AutoTuningAPIHelper();
     Map<String, Double> outputParams = autoTuningAPIHelper.getCurrentRunParameters(tuningInput);
     if (outputParams != null) {
       logger.info("Output params " + outputParams);
-      return ok(formatGetCurrentRunParametersOutput(outputParams, tuningInput.getVersion()));
+      return ok(Json.toJson(outputParams));
     } else {
       AutoTuningMetricsController.markGetCurrentRunParametersFailures();
       return notFound("Unable to find parameters. Job id: " + tuningInput.getJobDefId() + " Flow id: "

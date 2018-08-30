@@ -24,9 +24,8 @@ import java.util.List;
 import java.util.Map;
 import models.JobExecution;
 import models.JobExecution.ExecutionState;
-import models.JobSuggestedParamSet;
-import models.JobSuggestedParamSet.ParamSetStatus;
-import models.TuningJobExecutionParamSet;
+import models.TuningJobExecution;
+import models.TuningJobExecution.ParamSetStatus;
 import org.apache.log4j.Logger;
 
 
@@ -40,27 +39,26 @@ public class AzkabanJobCompleteDetector extends JobCompleteDetector {
   private AzkabanJobStatusUtil _azkabanJobStatusUtil;
 
   public enum AzkabanJobStatus {
-    FAILED, CANCELLED, KILLED, SUCCEEDED, SKIPPED
+    FAILED, CANCELLED, KILLED, SUCCEEDED
   }
 
   /**
    * Returns the list of completed executions
-   * @param inProgressExecutionParamSet List of executions (with corresponding param set) in progress
+   * @param jobExecutions Started Execution list
    * @return List of completed executions
-   * @throws MalformedURLException MalformedURLException
-   * @throws URISyntaxException URISyntaxException
+   * @throws MalformedURLException
+   * @throws URISyntaxException
    */
-  protected List<JobExecution> getCompletedExecutions(List<TuningJobExecutionParamSet> inProgressExecutionParamSet)
+  protected List<TuningJobExecution> getCompletedExecutions(List<TuningJobExecution> jobExecutions)
       throws MalformedURLException, URISyntaxException {
     logger.info("Fetching the list of executions completed since last iteration");
-    List<JobExecution> completedExecutions = new ArrayList<JobExecution>();
+    List<TuningJobExecution> completedExecutions = new ArrayList<TuningJobExecution>();
     try {
-      for (TuningJobExecutionParamSet tuningJobExecutionParamSet : inProgressExecutionParamSet) {
+      for (TuningJobExecution tuningJobExecution : jobExecutions) {
 
-        JobSuggestedParamSet jobSuggestedParamSet = tuningJobExecutionParamSet.jobSuggestedParamSet;
-        JobExecution jobExecution = tuningJobExecutionParamSet.jobExecution;
+        JobExecution jobExecution = tuningJobExecution.jobExecution;
 
-        logger.info("Checking current status of started execution: " + jobExecution.jobExecId);
+        logger.info("Checking current status of started execution: " + tuningJobExecution.jobExecution.jobExecId);
 
         if (_azkabanJobStatusUtil == null) {
           logger.info("Initializing  AzkabanJobStatusUtil");
@@ -74,32 +72,23 @@ public class AzkabanJobCompleteDetector extends JobCompleteDetector {
               logger.info("Job Found:" + job.getKey() + ". Status: " + job.getValue());
               if (job.getKey().equals(jobExecution.job.jobName)) {
                 if (job.getValue().equals(AzkabanJobStatus.FAILED.toString())) {
-                  if (jobSuggestedParamSet.paramSetState.equals(ParamSetStatus.SENT)) {
-                    jobSuggestedParamSet.paramSetState = ParamSetStatus.EXECUTED;
-                  }
+                  tuningJobExecution.paramSetState = ParamSetStatus.EXECUTED;
                   jobExecution.executionState = ExecutionState.FAILED;
-                } else if (job.getValue().equals(AzkabanJobStatus.SUCCEEDED.toString())) {
-                  if (jobSuggestedParamSet.paramSetState.equals(ParamSetStatus.SENT)) {
-                    jobSuggestedParamSet.paramSetState = ParamSetStatus.EXECUTED;
-                  }
-                  jobExecution.executionState = ExecutionState.SUCCEEDED;
-                } else if (job.getValue().equals(AzkabanJobStatus.CANCELLED.toString()) || job.getValue()
-                    .equals(AzkabanJobStatus.KILLED.toString()) || job.getValue()
-                    .equals(AzkabanJobStatus.SKIPPED.toString())) {
-                  if (jobSuggestedParamSet.paramSetState.equals(ParamSetStatus.SENT)) {
-                    jobSuggestedParamSet.paramSetState = ParamSetStatus.EXECUTED;
-                  }
+                }
+                if (job.getValue().equals(AzkabanJobStatus.CANCELLED.toString()) || job.getValue()
+                    .equals(AzkabanJobStatus.KILLED.toString())) {
+                  tuningJobExecution.paramSetState = ParamSetStatus.EXECUTED;
                   jobExecution.executionState = ExecutionState.CANCELLED;
                 }
-
-                if (jobExecution.executionState.equals(ExecutionState.SUCCEEDED) || jobExecution.executionState.equals(
-                    ExecutionState.FAILED) || jobExecution.executionState.equals(ExecutionState.CANCELLED)) {
-                  jobExecution.update();
-                  jobSuggestedParamSet.update();
-                  completedExecutions.add(jobExecution);
-                  logger.info("Execution " + jobExecution.jobExecId + " is completed");
+                if (job.getValue().equals(AzkabanJobStatus.SUCCEEDED.toString())) {
+                  tuningJobExecution.paramSetState = ParamSetStatus.EXECUTED;
+                  jobExecution.executionState = ExecutionState.SUCCEEDED;
+                }
+                if (tuningJobExecution.paramSetState.equals(ParamSetStatus.EXECUTED)) {
+                  completedExecutions.add(tuningJobExecution);
+                  logger.info("Execution " + tuningJobExecution.jobExecution.jobExecId + " is completed");
                 } else {
-                  logger.info("Execution " + jobExecution.jobExecId + " is still in running state");
+                  logger.info("Execution " + tuningJobExecution.jobExecution.jobExecId + " is still in running state");
                 }
               }
             }

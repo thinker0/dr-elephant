@@ -16,8 +16,6 @@
 
 package models;
 
-import com.avaje.ebean.annotation.UpdatedTimestamp;
-import java.sql.Timestamp;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -44,8 +42,6 @@ public class FlowExecution extends Model {
     public static final String flowExecId = "flowExecId";
     public static final String flowExecUrl = "flowExecUrl";
     public static final String flowDefinition = "flowDefinition";
-    public static final String createdTs = "createdTs";
-    public static final String updatedTs = "updatedTs";
   }
 
   @Id
@@ -58,30 +54,10 @@ public class FlowExecution extends Model {
   @Column(nullable = false)
   public String flowExecUrl;
 
-  @Column(nullable = false)
   @ManyToOne(cascade = CascadeType.ALL)
   @JoinTable(name = "flow_definition", joinColumns = {@JoinColumn(name = "flow_definition_id", referencedColumnName = "id")})
   public FlowDefinition flowDefinition;
 
-  @Column(nullable = false)
-  public Timestamp createdTs;
-
-  @Column(nullable = false)
-  @UpdatedTimestamp
-  public Timestamp updatedTs;
-
   public static Model.Finder<Integer, FlowExecution> find =
       new Model.Finder<Integer, FlowExecution>(Integer.class, FlowExecution.class);
-
-  @Override
-  public void save() {
-    this.updatedTs = new Timestamp(System.currentTimeMillis());
-    super.save();
-  }
-
-  @Override
-  public void update() {
-    this.updatedTs = new Timestamp(System.currentTimeMillis());
-    super.update();
-  }
 }

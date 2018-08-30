@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 import models.JobDefinition;
 import models.JobExecution;
-import models.JobSuggestedParamSet;
 import models.JobSuggestedParamValue;
 import models.TuningAlgorithm;
 import models.TuningJobDefinition;
+import models.TuningJobExecution;
 import models.TuningParameter;
 import org.junit.Before;
 import org.junit.Test;
@@ -203,19 +203,19 @@ public class PSOParamGeneratorTest {
         PSOParamGenerator psoParamGenerator = new PSOParamGenerator();
         psoParamGenerator.getParams();
 
-        List<JobSuggestedParamSet> jobSuggestedParamSetList = JobSuggestedParamSet.find.where()
-            .eq(JobSuggestedParamSet.TABLE.paramSetState, JobSuggestedParamSet.ParamSetStatus.CREATED)
+        List<TuningJobExecution> tuningJobExecutionList = TuningJobExecution.find.where()
+            .eq(TuningJobExecution.TABLE.paramSetState, TuningJobExecution.ParamSetStatus.CREATED)
             .findList();
-        assertEquals("Swarm size did not match", SWARM_SIZE, jobSuggestedParamSetList.size());
+        assertEquals("Swarm size did not match", SWARM_SIZE, tuningJobExecutionList.size());
 
-        JobSuggestedParamSet jobSuggestedParamSet = jobSuggestedParamSetList.get(0);
+        TuningJobExecution tuningJobExecution = tuningJobExecutionList.get(0);
 
         List<JobSuggestedParamValue> jobSuggestedParamValueList = JobSuggestedParamValue.find.where()
-            .eq(JobSuggestedParamValue.TABLE.jobSuggestedParamSet + '.' + JobSuggestedParamSet.TABLE.id,
-                jobSuggestedParamSet.id)
+            .eq(JobSuggestedParamValue.TABLE.jobExecution + '.' + JobExecution.TABLE.id,
+                tuningJobExecution.jobExecution.id)
             .findList();
 
-        TuningAlgorithm tuningAlgorithm = jobSuggestedParamSet.tuningAlgorithm;
+        TuningAlgorithm tuningAlgorithm = tuningJobExecution.tuningAlgorithm;
         List<TuningParameter> tuningParameterList = TuningParameter.find.where()
             .eq(TuningParameter.TABLE.tuningAlgorithm + "." + TuningAlgorithm.TABLE.id, tuningAlgorithm.id)
             .findList();

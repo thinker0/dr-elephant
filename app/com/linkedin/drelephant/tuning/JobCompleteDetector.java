@@ -16,14 +16,20 @@
 
 package com.linkedin.drelephant.tuning;
 
-import controllers.AutoTuningMetricsController;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.List;
+
 import models.JobExecution;
 import models.JobExecution.ExecutionState;
-import models.TuningJobExecutionParamSet;
+import models.TuningJobExecution;
+import models.TuningJobExecution.ParamSetStatus;
+
 import org.apache.log4j.Logger;
+
+import controllers.AutoTuningMetricsController;
+import play.libs.Json;
 
 
 /**
@@ -35,54 +41,77 @@ public abstract class JobCompleteDetector {
 
   /**
    * Updates the status of completed executions
+   * @return List of completed executions
    * @throws MalformedURLException MalformedURLException
    * @throws URISyntaxException URISyntaxException
    */
-  public void updateCompletedExecutions() throws MalformedURLException, URISyntaxException {
-    logger.info("Updating execution status");
-    List<TuningJobExecutionParamSet> inProgressExecutionParamSet = getExecutionsInProgress();
-    List<JobExecution> completedExecutions = getCompletedExecutions(inProgressExecutionParamSet);
+  public List<TuningJobExecution> updateCompletedExecutions() throws MalformedURLException, URISyntaxException {
+    logger.info("Checking execution status");
+    List<TuningJobExecution> runningExecutions = getStartedExecutions();
+    List<TuningJobExecution> completedExecutions = getCompletedExecutions(runningExecutions);
+    updateExecutionStatus(completedExecutions);
     updateMetrics(completedExecutions);
     logger.info("Finished updating execution status");
+    return completedExecutions;
   }
 
   /**
-   * Updates metrics for auto tuning monitoring for job completion daemon
+   * This method is for updating metrics for auto tuning monitoring for job completion daemon
    * @param completedExecutions List completed job executions
    */
-  private void updateMetrics(List<JobExecution> completedExecutions) {
-    for (JobExecution jobExecution : completedExecutions) {
-      if (jobExecution.executionState.equals(ExecutionState.SUCCEEDED)) {
-        AutoTuningMetricsController.markSuccessfulJobs();
-      } else if (jobExecution.executionState.equals(ExecutionState.FAILED)) {
-        AutoTuningMetricsController.markFailedJobs();
+  private void updateMetrics(List<TuningJobExecution> completedExecutions) {
+    for (TuningJobExecution tuningJobExecution : completedExecutions) {
+      if (tuningJobExecution.paramSetState.equals(ParamSetStatus.EXECUTED)) {
+        if (tuningJobExecution.jobExecution.executionState.equals(ExecutionState.SUCCEEDED)) {
+          AutoTuningMetricsController.markSuccessfulJobs();
+        } else if (tuningJobExecution.jobExecution.executionState.equals(ExecutionState.FAILED)) {
+          AutoTuningMetricsController.markFailedJobs();
+        }
       }
     }
   }
 
   /**
-   * Returns the executions in progress
+   * Returns the list of executions which have already received param suggestion
    * @return JobExecution list
    */
-  private List<TuningJobExecutionParamSet> getExecutionsInProgress() {
-    logger.info("Fetching the executions which are in progress");
-    List<TuningJobExecutionParamSet> tuningJobExecutionParamSets = TuningJobExecutionParamSet.find.fetch(TuningJobExecutionParamSet.TABLE.jobExecution)
-        .fetch(TuningJobExecutionParamSet.TABLE.jobSuggestedParamSet)
-        .where()
-        .eq(TuningJobExecutionParamSet.TABLE.jobExecution + '.' + JobExecution.TABLE.executionState,
-            ExecutionState.IN_PROGRESS)
-        .findList();
-    logger.info("Number of executions which are in progress: " + tuningJobExecutionParamSets.size());
-    return tuningJobExecutionParamSets;
+  private List<TuningJobExecution> getStartedExecutions() {
+    logger.info("Fetching the executions which were running");
+    List<TuningJobExecution> tuningJobExecutionList = new ArrayList<TuningJobExecution>();
+    try {
+      tuningJobExecutionList = TuningJobExecution.find.select("*")
+          .where()
+          .eq(TuningJobExecution.TABLE.paramSetState, ParamSetStatus.SENT)
+          .findList();
+    } catch (NullPointerException e) {
+      logger.info("None of the executions were running ", e);
+    }
+    logger.info("Number of executions which were in running state: " + tuningJobExecutionList.size());
+    return tuningJobExecutionList;
   }
 
   /**
    * Returns the list of completed executions.
-   * @param inProgressExecutionParamSet List of executions (with corresponding param set) in progress
+   * @param jobExecutions Started Execution list
    * @return List of completed executions
-   * @throws MalformedURLException MalformedURLException
-   * @throws URISyntaxException URISyntaxException
+   * @throws MalformedURLException
+   * @throws URISyntaxException
    */
-  protected abstract List<JobExecution> getCompletedExecutions(
-      List<TuningJobExecutionParamSet> inProgressExecutionParamSet) throws MalformedURLException, URISyntaxException;
+  protected abstract List<TuningJobExecution> getCompletedExecutions(List<TuningJobExecution> jobExecutions)
+      throws MalformedURLException, URISyntaxException;
+
+  /**
+   * Updates the job execution status
+   * @param jobExecutions JobExecution list
+   * @return Update status
+   */
+  private void updateExecutionStatus(List<TuningJobExecution> jobExecutions) {
+    logger.info("Updating status of executions completed since last iteration");
+    for (TuningJobExecution tuningJobExecution : jobExecutions) {
+      JobExecution jobExecution = tuningJobExecution.jobExecution;
+      logger.info("Updating execution status to EXECUTED for the execution: " + jobExecution.jobExecId);
+      jobExecution.update();
+      tuningJobExecution.update();
+    }
+  }
 }
