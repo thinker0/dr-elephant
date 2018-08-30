@@ -42,8 +42,8 @@ public abstract class JobCompleteDetector {
   /**
    * Updates the status of completed executions
    * @return List of completed executions
-   * @throws MalformedURLException MalformedURLException
-   * @throws URISyntaxException URISyntaxException
+   * @throws MalformedURLException
+   * @throws URISyntaxException
    */
   public List<TuningJobExecution> updateCompletedExecutions() throws MalformedURLException, URISyntaxException {
     logger.info("Checking execution status");
@@ -57,7 +57,7 @@ public abstract class JobCompleteDetector {
 
   /**
    * This method is for updating metrics for auto tuning monitoring for job completion daemon
-   * @param completedExecutions List completed job executions
+   * @param completedExecutions
    */
   private void updateMetrics(List<TuningJobExecution> completedExecutions) {
     for (TuningJobExecution tuningJobExecution : completedExecutions) {

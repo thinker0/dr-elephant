@@ -268,7 +268,7 @@ public class InfoExtractor {
     for (SchedulerConfigurationData data : _configuredSchedulers) {
       if (data.getSchedulerName().equals(scheduler)) {
         try {
-          String workflowClass = data.getParamMap().get("workflow_client");
+          String workflowClass = data.getParamMap().get("exception_class");
           Class<?> schedulerClass = Class.forName(workflowClass);
           Object instance = schedulerClass.getConstructor(String.class).newInstance(url);
           if (!(instance instanceof WorkflowClient)) {
