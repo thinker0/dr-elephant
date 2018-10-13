@@ -47,10 +47,11 @@ class SparkDataCollection extends SparkApplicationData {
   import SparkDataCollection._
 
   lazy val applicationEventListener = new ApplicationEventListener()
-  lazy val jobProgressListener = new JobProgressListener(new SparkConf())
+  lazy val sparkConf = new SparkConf()
+  lazy val jobProgressListener = new JobProgressListener(sparkConf)
   lazy val environmentListener = new EnvironmentListener()
-  lazy val storageStatusListener = new StorageStatusListener()
-  lazy val executorsListener = new ExecutorsListener(storageStatusListener)
+  lazy val storageStatusListener = new StorageStatusListener(sparkConf)
+  lazy val executorsListener = new ExecutorsListener(storageStatusListener, sparkConf)
   lazy val storageListener = new StorageListener(storageStatusListener)
 
   // This is a customized listener that tracks peak used memory
@@ -164,10 +165,8 @@ class SparkDataCollection extends SparkApplicationData {
     if (_executorData == null) {
       _executorData = new SparkExecutorData()
 
-      for (statusId <- 0 until executorsListener.storageStatusList.size) {
+      for (status <- executorsListener.activeStorageStatusList) {
         val info = new ExecutorInfo()
-
-        val status = executorsListener.storageStatusList(statusId)
 
         info.execId = status.blockManagerId.executorId
         info.hostPort = status.blockManagerId.hostPort
@@ -178,14 +177,17 @@ class SparkDataCollection extends SparkApplicationData {
         info.memUsed = storageStatusTrackingListener.executorIdToMaxUsedMem.getOrElse(info.execId, 0L)
         info.maxMem = status.maxMem
         info.diskUsed = status.diskUsed
-        info.activeTasks = executorsListener.executorToTasksActive.getOrElse(info.execId, 0)
-        info.failedTasks = executorsListener.executorToTasksFailed.getOrElse(info.execId, 0)
-        info.completedTasks = executorsListener.executorToTasksComplete.getOrElse(info.execId, 0)
-        info.totalTasks = info.activeTasks + info.failedTasks + info.completedTasks
-        info.duration = executorsListener.executorToDuration.getOrElse(info.execId, 0L)
-        info.inputBytes = executorsListener.executorToInputBytes.getOrElse(info.execId, 0L)
-        info.shuffleRead = executorsListener.executorToShuffleRead.getOrElse(info.execId, 0L)
-        info.shuffleWrite = executorsListener.executorToShuffleWrite.getOrElse(info.execId, 0L)
+        executorsListener.executorToTaskSummary.get(info.execId).foreach { taskSummary =>
+          info.activeTasks = taskSummary.tasksActive
+          info.failedTasks = taskSummary.tasksFailed
+          info.completedTasks = taskSummary.tasksComplete
+          info.totalTasks = info.activeTasks + info.failedTasks + info.completedTasks
+          info.duration = taskSummary.duration
+          info.inputBytes = taskSummary.inputBytes
+          info.outputBytes = taskSummary.outputBytes
+          info.shuffleRead = taskSummary.shuffleRead
+          info.shuffleWrite = taskSummary.shuffleWrite
+        }
 
         _executorData.setExecutorInfo(info.execId, info)
       }
